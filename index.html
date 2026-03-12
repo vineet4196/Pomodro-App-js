@@ -874,9 +874,8 @@
   }
 
   /* ══ MODE ═══════════════════════════════════════ */
-  function modeSecs(m) {
-    return (m===M.P ? cfg.pomodoroTime : m===M.S ? cfg.shortBreakTime : cfg.longBreakTime) * 60;
-  }
+  const MODE_MINS = { [M.P]: () => cfg.pomodoroTime, [M.S]: () => cfg.shortBreakTime, [M.L]: () => cfg.longBreakTime };
+  function modeSecs(m) { return MODE_MINS[m]() * 60; }
 
   function applyMode(mode, doReset=true) {
     ts.mode = mode;
@@ -1125,9 +1124,9 @@
     const mx=Math.max(...counts,1);
     days.forEach((d,i)=>{
       const bar=document.createElement('div'); bar.className='bar';
-      bar.style.height=`${Math.max((counts[i]/mx)*72,counts[i]>0?10:4)}px`;
+      bar.style.height=`${Math.max((counts[i]/mx)*CHART_MAX_H, counts[i]>0 ? CHART_MIN_H : CHART_EMPTY_H)}px`;
       bar.style.background=counts[i]>0?'#ef5350':'#e0e0e0';
-      bar.title=`${counts[i]} pomodoro${counts[i]!==1?'s':''}`;
+      bar.title=plural(counts[i], 'pomodoro');
       ch.appendChild(bar);
       const sp=document.createElement('span');
       sp.textContent=d.toLocaleDateString('en',{weekday:'narrow'});
@@ -1136,6 +1135,10 @@
   }
 
   /* ══ SOUND ══════════════════════════════════════ */
+  const CHART_MAX_H = 72;    // px height for a full bar
+  const CHART_MIN_H = 10;    // px minimum height for a non-zero bar
+  const CHART_EMPTY_H = 4;   // px height for an empty bar
+  function plural(n, word) { return `${n} ${word}${n !== 1 ? 's' : ''}`; }
   let _ac=null;
   function getAC() { return _ac||(_ac=new(window.AudioContext||window.webkitAudioContext)()); }
 

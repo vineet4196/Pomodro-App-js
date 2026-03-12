@@ -1,6 +1,6 @@
 # Pomodoro App
 
-A beautiful, feature-rich Pomodoro timer built with **HTML**, **Tailwind CSS** (Material-inspired), and **Vanilla JavaScript** — no database, no build step required.
+A beautiful, feature-rich Pomodoro timer built with **HTML**, **Material-inspired custom CSS**, and **Vanilla JavaScript** — no database, no build step, no CDN dependencies required.
 
 ## ✨ Features
 
@@ -35,10 +35,8 @@ xdg-open index.html    # Linux
 start index.html       # Windows
 ```
 
-CDN dependencies (loaded automatically):
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Material Icons](https://fonts.google.com/icons)
-- [Roboto font](https://fonts.google.com/specimen/Roboto)
+CDN dependencies (loaded automatically, optional — app still works offline):
+- [Roboto font](https://fonts.google.com/specimen/Roboto) *(falls back to system-ui)*
 
 ## 🎯 How the Pomodoro Technique Works
 
@@ -60,11 +58,11 @@ All sessions, tasks, and settings are stored in the browser's `localStorage` und
 
 | Key | Contents |
 |---|---|
-| `pomo_settings` | Timer durations, auto-start, sound, notification preferences |
-| `pomo_history`  | Array of completed pomodoro sessions and finished tasks |
-| `pomo_tasks`    | Current task list |
-| `pomo_state`    | Current mode, session count |
-| `pomo_dark`     | Dark mode preference |
+| `pomo_cfg`     | Timer durations, auto-start, sound, notification preferences |
+| `pomo_history` | Array of completed pomodoro sessions and finished tasks |
+| `pomo_tasks`   | Current task list |
+| `pomo_ts`      | Current mode, session count |
+| `pomo_dark`    | Dark mode preference |
 
 ## 📄 License
 
