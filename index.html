@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pomodoro App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── RESET ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      transition: background 0.5s ease;
+      overflow-x: hidden;
+    }
+
+    /* ── CSS VARIABLES ─────────────────────────── */
+    :root {
+      --surface:       #ffffff;
+      --surface-2:     #f5f5f5;
+      --on-surface:    #212121;
+      --on-surface-2:  #757575;
+      --border:        #e0e0e0;
+      --shadow:        rgba(0,0,0,0.18);
+    }
+    body.dark {
+      --surface:       #1e1e2e;
+      --surface-2:     #2a2a3e;
+      --on-surface:    #e0e0e0;
+      --on-surface-2:  #9e9e9e;
+      --border:        #37375a;
+      --shadow:        rgba(0,0,0,0.45);
+    }
+
+    /* ── SCROLLBAR ─────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
+
+    /* ── ICON SYSTEM ───────────────────────────── */
+    .icon { display: inline-flex; align-items: center; justify-content: center;
+            flex-shrink: 0; vertical-align: middle; }
+    .icon svg { fill: currentColor; }
+
+    /* ── UTILITY ───────────────────────────────── */
+    .hidden { display: none !important; }
+
+    /* ── TOP BAR ───────────────────────────────── */
+    #topBar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 8px;
+      color: #fff; font-size: 1.15rem; font-weight: 700; letter-spacing: 0.4px;
+    }
+    .bar-actions { display: flex; align-items: center; gap: 2px; }
+    .icon-btn {
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.92);
+      width: 42px; height: 42px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .icon-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── MAIN ──────────────────────────────────── */
+    main {
+      display: flex; flex-direction: column; align-items: center;
+      padding-top: 72px; padding-bottom: 40px; min-height: 100vh;
+    }
+
+    /* ── SESSION LABEL ─────────────────────────── */
+    #sessionLabel {
+      color: rgba(255,255,255,0.85); font-size: 0.72rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 12px;
+    }
+
+    /* ── MODE TABS ─────────────────────────────── */
+    .mode-tabs {
+      display: flex; gap: 4px;
+      background: rgba(255,255,255,0.18);
+      padding: 4px; border-radius: 99px;
+      margin-bottom: 32px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .mode-btn {
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.75);
+      padding: 8px 20px; border-radius: 99px;
+      font-size: 0.83rem; font-weight: 500;
+      font-family: inherit;
+      transition: background 0.2s, color 0.2s, transform 0.15s;
+      white-space: nowrap;
+    }
+    .mode-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .mode-btn.active {
+      background: rgba(255,255,255,0.9); color: #333;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.18); transform: scale(1.03);
+    }
+
+    /* ── TIMER RING ────────────────────────────── */
+    #timerContainer {
+      position: relative; width: 288px; height: 288px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 30px;
+    }
+    #timerContainer svg.ring {
+      position: absolute;
+      filter: drop-shadow(0 8px 24px rgba(0,0,0,0.22));
+    }
+    #progressRing {
+      transform-origin: 50% 50%;
+      transform: rotate(-90deg);
+      transition: stroke-dashoffset 1s linear;
+      stroke-linecap: round;
+    }
+    #timerCenter {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    #timerDisplay {
+      font-size: 4.6rem; font-weight: 300; color: #fff;
+      letter-spacing: -3px; font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    #timerSubtitle {
+      font-size: 0.78rem; color: rgba(255,255,255,0.65);
+      margin-top: 6px; font-weight: 500;
+    }
+    #pulseRing {
+      position: absolute; width: 296px; height: 296px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.22);
+      animation: pulseAnim 2s ease-out infinite; pointer-events: none;
+    }
+    @keyframes pulseAnim {
+      0%   { transform: scale(1); opacity: 0.7; }
+      100% { transform: scale(1.15); opacity: 0; }
+    }
+
+    /* ── CONTROLS ──────────────────────────────── */
+    .controls {
+      display: flex; align-items: center; gap: 22px; margin-bottom: 26px;
+    }
+    .ctrl-btn {
+      background: rgba(255,255,255,0.2); border: none; cursor: pointer; color: #fff;
+      width: 50px; height: 50px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, transform 0.15s;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+    .ctrl-btn:hover  { background: rgba(255,255,255,0.32); }
+    .ctrl-btn:active { transform: scale(0.94); }
+    #startBtn {
+      background: #fff; width: 82px; height: 82px; border-radius: 50%;
+      border: none; cursor: pointer; color: #333;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    #startBtn:hover  { transform: scale(1.06); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    #startBtn:active { transform: scale(0.95); }
+
+    /* ── CYCLE DOTS ────────────────────────────── */
+    #pomodoroCounter { display: flex; gap: 10px; margin-bottom: 30px; min-height: 18px; }
+    .pom-dot {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.65); background: transparent;
+      transition: background 0.3s, transform 0.3s;
+    }
+    .pom-dot.filled { background: #fff; transform: scale(1.18); border-color: #fff; }
+
+    /* ── GLASS CARD ────────────────────────────── */
+    .card {
+      width: 100%; max-width: 440px;
+      background: rgba(255,255,255,0.18);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.28);
+      border-radius: 24px; padding: 20px; margin-bottom: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+    }
+    .card-title {
+      display: flex; align-items: center; gap: 8px;
+      color: #fff; font-size: 1rem; font-weight: 600;
+    }
+    .badge {
+      background: rgba(255,255,255,0.28); color: #fff;
+      font-size: 11px; font-weight: 700; padding: 2px 8px;
+      border-radius: 99px; min-width: 22px; text-align: center;
+    }
+    .text-btn {
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.65); font-size: 0.75rem;
+      display: flex; align-items: center; gap: 4px; font-family: inherit;
+      transition: color 0.2s;
+    }
+    .text-btn:hover { color: #fff; }
+
+    /* ── TASK INPUT ────────────────────────────── */
+    .task-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .task-input {
+      flex: 1; background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.35); border-radius: 14px;
+      padding: 9px 14px; color: #fff; font-size: 0.87rem; font-family: inherit;
+      outline: none; transition: border-color 0.2s;
+    }
+    .task-input::placeholder { color: rgba(255,255,255,0.5); }
+    .task-input:focus { border-color: rgba(255,255,255,0.7); }
+    .add-btn {
+      background: rgba(255,255,255,0.25); border: none; cursor: pointer; color: #fff;
+      width: 42px; height: 42px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .add-btn:hover { background: rgba(255,255,255,0.4); }
+
+    /* ── TASK LIST ─────────────────────────────── */
+    #taskList { list-style: none; max-height: 200px; overflow-y: auto; padding-right: 2px; }
+    .empty-msg { color: rgba(255,255,255,0.5); font-size: 0.83rem; text-align: center; padding: 16px 0; }
+    .task-item {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.13); border-radius: 14px;
+      padding: 9px 12px; margin-bottom: 7px;
+      transition: transform 0.2s;
+    }
+    .task-item:hover { transform: translateX(3px); }
+    .task-check-btn {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.6); background: none; cursor: pointer; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .task-check-btn.done { background: rgba(255,255,255,0.88); border-color: rgba(255,255,255,0.88); color: #555; }
+    .task-check-btn:not(.done) .icon { opacity: 0; }
+    .task-check-btn:hover { border-color: #fff; }
+    .task-text { flex: 1; color: #fff; font-size: 0.85rem; line-height: 1.35; }
+    .task-text.done { text-decoration: line-through; opacity: 0.5; }
+    .task-del-btn {
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.4); display: flex; align-items: center;
+      transition: color 0.2s;
+    }
+    .task-del-btn:hover { color: rgba(255,255,255,0.85); }
+
+    /* ── KEYBOARD SHORTCUTS ────────────────────── */
+    .shortcuts-card {
+      width: 100%; max-width: 440px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 16px; padding: 12px 16px; margin-bottom: 16px;
+    }
+    .shortcut-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .shortcut-item { display: flex; align-items: center; gap: 5px; }
+    .key-badge {
+      background: rgba(255,255,255,0.3); color: #fff; font-size: 0.68rem; font-weight: 700;
+      padding: 2px 6px; border-radius: 5px; font-family: monospace;
+    }
+    .key-desc { color: rgba(255,255,255,0.65); font-size: 0.72rem; }
+
+    /* ── SIDE PANELS ───────────────────────────── */
+    .panel-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
+    }
+    .panel {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 100%; max-width: 360px;
+      background: var(--surface); box-shadow: -4px 0 40px var(--shadow);
+      overflow-y: auto; animation: slideIn 0.28s ease-out; z-index: 51;
+    }
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: none; } }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 20px 0; margin-bottom: 20px;
+    }
+    .panel-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 1.15rem; font-weight: 700; color: var(--on-surface);
+    }
+    .panel-close {
+      background: none; border: none; cursor: pointer; color: var(--on-surface-2);
+      padding: 6px; border-radius: 50%; display: flex; align-items: center;
+      transition: background 0.2s;
+    }
+    .panel-close:hover { background: var(--surface-2); }
+    .panel-body { padding: 0 20px 20px; }
+
+    /* ── STATS ─────────────────────────────────── */
+    .filter-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+    .filter-btn {
+      flex: 1; padding: 7px 0; border: 1.5px solid var(--border);
+      border-radius: 12px; background: none; color: var(--on-surface-2);
+      font-size: 0.78rem; font-weight: 500; font-family: inherit; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover { background: var(--surface-2); }
+    .filter-btn.active { background: #ef5350; border-color: #ef5350; color: #fff; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .stat-card {
+      border-radius: 18px; padding: 16px;
+      box-shadow: 0 2px 8px var(--shadow);
+      transition: transform 0.2s, box-shadow 0.2s; cursor: default;
+    }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px var(--shadow); }
+    .stat-card.red    { background: #ffebee; }
+    .stat-card.blue   { background: #e3f2fd; }
+    .stat-card.green  { background: #e8f5e9; }
+    .stat-card.purple { background: #f3e5f5; }
+    body.dark .stat-card.red    { background: rgba(239,83,80,0.12); }
+    body.dark .stat-card.blue   { background: rgba(66,165,245,0.12); }
+    body.dark .stat-card.green  { background: rgba(102,187,106,0.12); }
+    body.dark .stat-card.purple { background: rgba(171,71,188,0.12); }
+    .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 0.72rem; color: var(--on-surface-2); }
+    .stat-card.red .stat-value    { color: #ef5350; }
+    .stat-card.blue .stat-value   { color: #42a5f5; }
+    .stat-card.green .stat-value  { color: #66bb6a; }
+    .stat-card.purple .stat-value { color: #ab47bc; }
+    .chart-title { font-size: 0.75rem; font-weight: 600; color: var(--on-surface-2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+    #dailyChart { display: flex; align-items: flex-end; gap: 5px; height: 80px; }
+    #dailyChart .bar { flex: 1; border-radius: 4px 4px 0 0; min-height: 4px; transition: height 0.5s ease; }
+    #dailyLabels { display: flex; gap: 5px; margin-top: 4px; }
+    #dailyLabels span { flex: 1; text-align: center; font-size: 0.68rem; color: var(--on-surface-2); }
+
+    /* ── HISTORY ───────────────────────────────── */
+    .hist-actions { display: flex; align-items: center; gap: 10px; }
+    .danger-btn {
+      background: none; border: none; cursor: pointer; color: #ef5350;
+      font-size: 0.75rem; font-family: inherit; display: flex; align-items: center; gap: 4px;
+      transition: opacity 0.2s;
+    }
+    .danger-btn:hover { opacity: 0.7; }
+    .hist-day { font-size: 0.7rem; font-weight: 600; color: var(--on-surface-2);
+                text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; margin-top: 14px; }
+    .hist-day:first-child { margin-top: 0; }
+    .hist-item {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface-2); border-radius: 14px; padding: 12px; margin-bottom: 8px;
+      animation: fadeUp 0.25s ease-out;
+    }
+    @keyframes fadeUp { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .hist-emoji { font-size: 1.4rem; flex-shrink: 0; }
+    .hist-info { flex: 1; }
+    .hist-title { font-size: 0.85rem; font-weight: 500; color: var(--on-surface); }
+    .hist-meta  { font-size: 0.72rem; color: var(--on-surface-2); margin-top: 2px; }
+    .hist-badge { font-size: 0.72rem; font-weight: 700; }
+    .hist-badge.pom   { color: #ef5350; }
+    .hist-badge.task  { color: #66bb6a; }
+    .hist-badge.break { color: #42a5f5; }
+
+    /* ── SETTINGS MODAL ────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal {
+      background: var(--surface); border-radius: 28px;
+      width: 100%; max-width: 420px; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: fadeUp 0.3s ease-out;
+    }
+    .modal-header {
+      background: #ef5350; padding: 20px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h2 { color: #fff; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .modal-header .icon-btn { color: rgba(255,255,255,0.9); }
+    .modal-header .icon-btn:hover { background: rgba(255,255,255,0.2); }
+    .modal-body { padding: 20px 24px; max-height: 68vh; overflow-y: auto; }
+    .sec-title {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.7rem; font-weight: 600; color: var(--on-surface-2);
+      text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 14px;
+    }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+    .time-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .t-group { text-align: center; }
+    .t-group label { display: block; font-size: 0.72rem; color: var(--on-surface-2); margin-bottom: 6px; }
+    .num-input {
+      width: 100%; text-align: center; border: 2px solid var(--border);
+      border-radius: 14px; padding: 10px 4px; font-size: 1.2rem; font-weight: 700;
+      color: var(--on-surface); background: var(--surface); font-family: inherit;
+      outline: none; transition: border-color 0.2s;
+    }
+    .num-input:focus { border-color: #ef5350; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .toggle-label { font-size: 0.88rem; color: var(--on-surface); }
+    .toggle-wrap { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0; background: #ccc; border-radius: 24px; cursor: pointer; transition: background 0.3s;
+    }
+    .toggle-track::before {
+      content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; top: 3px; left: 3px; transition: transform 0.3s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+    .toggle-wrap input:checked ~ .toggle-track { background: #ef5350; }
+    .toggle-wrap input:checked ~ .toggle-track::before { transform: translateX(20px); }
+    .interval-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .interval-input {
+      width: 64px; text-align: center; border: 2px solid var(--border); border-radius: 12px;
+      padding: 6px 4px; font-size: 1.1rem; font-weight: 700;
+      color: var(--on-surface); background: var(--surface); font-family: inherit;
+      outline: none; transition: border-color 0.2s;
+    }
+    .interval-input:focus { border-color: #66bb6a; }
+    .hint-text { font-size: 0.72rem; color: var(--on-surface-2); margin-bottom: 12px; }
+    .volume-row { margin-top: 10px; }
+    .volume-row label { font-size: 0.85rem; color: var(--on-surface); display: block; margin-bottom: 8px; }
+    input[type=range] { width: 100%; accent-color: #ef5350; cursor: pointer; }
+    .save-btn {
+      width: 100%; background: #ef5350; border: none; border-radius: 18px; padding: 14px;
+      color: #fff; font-size: 1rem; font-weight: 700; font-family: inherit; cursor: pointer;
+      transition: background 0.2s, transform 0.15s; box-shadow: 0 4px 14px rgba(239,83,80,0.4);
+      margin-top: 6px;
+    }
+    .save-btn:hover  { background: #e53935; }
+    .save-btn:active { transform: scale(0.98); }
+
+    /* ── COMPLETION MODAL ──────────────────────── */
+    .completion-inner { text-align: center; }
+    .completion-emoji { font-size: 3.5rem; margin: 24px 0 10px; }
+    .completion-title { font-size: 1.35rem; font-weight: 700; color: var(--on-surface); margin-bottom: 8px; }
+    .completion-msg   { font-size: 0.85rem; color: var(--on-surface-2); margin-bottom: 24px; padding: 0 20px; }
+    .completion-btns  { display: flex; gap: 10px; padding: 0 20px 24px; }
+    .completion-btns button {
+      flex: 1; padding: 12px; border-radius: 16px; font-size: 0.88rem; font-weight: 600;
+      font-family: inherit; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-stay { background: var(--surface-2); border: 1.5px solid var(--border); color: var(--on-surface-2); }
+    .btn-stay:hover { background: var(--border); }
+    .btn-next { background: #ef5350; border: none; color: #fff; box-shadow: 0 4px 12px rgba(239,83,80,0.3); }
+    .btn-next:hover { background: #e53935; }
+
+    /* ── TOAST ─────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100;
+      background: #212121; color: #fff; padding: 10px 20px; border-radius: 99px;
+      font-size: 0.85rem; font-weight: 500;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3); white-space: nowrap;
+      animation: fadeUp 0.25s ease-out;
+    }
+    body.dark #toast { background: #37474f; }
+
+    /* ── RESPONSIVE ────────────────────────────── */
+    @media (max-width: 400px) {
+      #timerDisplay { font-size: 3.8rem; }
+      #timerContainer { width: 248px; height: 248px; }
+      .panel { max-width: 100%; }
+    }
+  </style>
+</head>
+
+<body id="appBody">
+
+  <!-- SVG ICON SPRITE ─────────────────────────── -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="ic-timer" viewBox="0 0 24 24">
+      <path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+    </symbol>
+    <symbol id="ic-chart" viewBox="0 0 24 24">
+      <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
+    </symbol>
+    <symbol id="ic-history" viewBox="0 0 24 24">
+      <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+    </symbol>
+    <symbol id="ic-settings" viewBox="0 0 24 24">
+      <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+    </symbol>
+    <symbol id="ic-dark" viewBox="0 0 24 24">
+      <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+    </symbol>
+    <symbol id="ic-light" viewBox="0 0 24 24">
+      <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>
+    </symbol>
+    <symbol id="ic-refresh" viewBox="0 0 24 24">
+      <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+    </symbol>
+    <symbol id="ic-play" viewBox="0 0 24 24">
+      <path d="M8 5v14l11-7z"/>
+    </symbol>
+    <symbol id="ic-pause" viewBox="0 0 24 24">
+      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+    </symbol>
+    <symbol id="ic-skip" viewBox="0 0 24 24">
+      <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+    </symbol>
+    <symbol id="ic-add" viewBox="0 0 24 24">
+      <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+    </symbol>
+    <symbol id="ic-check" viewBox="0 0 24 24">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+    </symbol>
+    <symbol id="ic-close" viewBox="0 0 24 24">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    </symbol>
+    <symbol id="ic-delete" viewBox="0 0 24 24">
+      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+    </symbol>
+    <symbol id="ic-clear" viewBox="0 0 24 24">
+      <path d="M15 16h4v2h-4zm0-8h7v2h-7zm0 4h6v2h-6zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zM14 5h-3l-1-1H6L5 5H2v2h12z"/>
+    </symbol>
+    <symbol id="ic-task" viewBox="0 0 24 24">
+      <path d="M22 5.18L10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/>
+    </symbol>
+    <symbol id="ic-renew" viewBox="0 0 24 24">
+      <path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/>
+    </symbol>
+    <symbol id="ic-coffee" viewBox="0 0 24 24">
+      <path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/>
+    </symbol>
+    <symbol id="ic-volume" viewBox="0 0 24 24">
+      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+    </symbol>
+    <symbol id="ic-keyboard" viewBox="0 0 24 24">
+      <path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/>
+    </symbol>
+    <symbol id="ic-ok" viewBox="0 0 24 24">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+    </symbol>
+    <symbol id="ic-info" viewBox="0 0 24 24">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+    </symbol>
+  </svg>
+
+  <!-- ════════ TOP BAR ════════ -->
+  <header id="topBar">
+    <div class="brand">
+      <span class="icon"><svg width="28" height="28"><use href="#ic-timer"/></svg></span>
+      Pomodoro
+    </div>
+    <div class="bar-actions">
+      <button class="icon-btn" onclick="showPanel('stats')"   title="Statistics">
+        <span class="icon"><svg width="22" height="22"><use href="#ic-chart"/></svg></span>
+      </button>
+      <button class="icon-btn" onclick="showPanel('history')" title="History">
+        <span class="icon"><svg width="22" height="22"><use href="#ic-history"/></svg></span>
+      </button>
+      <button class="icon-btn" onclick="openSettings()" title="Settings">
+        <span class="icon"><svg width="22" height="22"><use href="#ic-settings"/></svg></span>
+      </button>
+      <button class="icon-btn" onclick="toggleDark()" id="darkBtn" title="Toggle dark mode">
+        <span class="icon" id="darkIcon"><svg width="22" height="22"><use href="#ic-dark"/></svg></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ════════ MAIN ════════ -->
+  <main>
+    <div id="sessionLabel">FOCUS TIME</div>
+
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+      <button class="mode-btn active" id="btn-pomodoro"   onclick="switchMode('pomodoro')">Pomodoro</button>
+      <button class="mode-btn"        id="btn-shortbreak" onclick="switchMode('shortbreak')">Short Break</button>
+      <button class="mode-btn"        id="btn-longbreak"  onclick="switchMode('longbreak')">Long Break</button>
+    </div>
+
+    <!-- Circular timer -->
+    <div id="timerContainer">
+      <div id="pulseRing" class="hidden"></div>
+      <svg class="ring" width="288" height="288" viewBox="0 0 288 288">
+        <circle cx="144" cy="144" r="130" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="10"/>
+        <circle cx="144" cy="144" r="130" fill="none" stroke="white" stroke-width="10"
+                stroke-dasharray="816.8" stroke-dashoffset="0" id="progressRing"/>
+      </svg>
+      <div id="timerCenter">
+        <div id="timerDisplay">25:00</div>
+        <div id="timerSubtitle">Session 1</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="ctrl-btn" onclick="resetTimer()" title="Reset (R)">
+        <span class="icon"><svg width="24" height="24"><use href="#ic-refresh"/></svg></span>
+      </button>
+      <button id="startBtn" onclick="toggleTimer()" title="Start / Pause (Space)">
+        <span class="icon" id="startIconWrap"><svg width="42" height="42"><use href="#ic-play"/></svg></span>
+      </button>
+      <button class="ctrl-btn" onclick="skipSession()" title="Skip (S)">
+        <span class="icon"><svg width="24" height="24"><use href="#ic-skip"/></svg></span>
+      </button>
+    </div>
+
+    <!-- Cycle dots -->
+    <div id="pomodoroCounter"></div>
+
+    <!-- Tasks card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon"><svg width="20" height="20"><use href="#ic-task"/></svg></span>
+          Tasks
+          <span class="badge" id="taskCount">0</span>
+        </div>
+        <button class="text-btn" onclick="clearCompletedTasks()">
+          <span class="icon"><svg width="16" height="16"><use href="#ic-clear"/></svg></span>
+          Clear done
+        </button>
+      </div>
+      <div class="task-input-row">
+        <input type="text" id="taskInput" class="task-input" placeholder="Add a new task…"
+               onkeydown="if(event.key==='Enter') addTask()" />
+        <button class="add-btn" onclick="addTask()">
+          <span class="icon"><svg width="22" height="22"><use href="#ic-add"/></svg></span>
+        </button>
+      </div>
+      <ul id="taskList">
+        <li class="empty-msg" id="emptyTaskMsg">No tasks yet. Add one above!</li>
+      </ul>
+    </div>
+
+    <!-- Keyboard shortcuts -->
+    <div class="shortcuts-card">
+      <div class="shortcut-list">
+        <div class="shortcut-item"><span class="key-badge">Space</span><span class="key-desc">Start/Pause</span></div>
+        <div class="shortcut-item"><span class="key-badge">R</span><span class="key-desc">Reset</span></div>
+        <div class="shortcut-item"><span class="key-badge">S</span><span class="key-desc">Skip</span></div>
+        <div class="shortcut-item"><span class="key-badge">1</span><span class="key-desc">Pomodoro</span></div>
+        <div class="shortcut-item"><span class="key-badge">2</span><span class="key-desc">Short Break</span></div>
+        <div class="shortcut-item"><span class="key-badge">3</span><span class="key-desc">Long Break</span></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ════════ STATS PANEL ════════ -->
+  <div id="statsWrapper" class="hidden">
+    <div class="panel-overlay" onclick="closePanel('stats')"></div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="icon" style="color:#ef5350"><svg width="22" height="22"><use href="#ic-chart"/></svg></span>
+          Statistics
+        </div>
+        <button class="panel-close" onclick="closePanel('stats')">
+          <span class="icon"><svg width="22" height="22"><use href="#ic-close"/></svg></span>
+        </button>
+      </div>
+      <div class="panel-body">
+        <div class="filter-tabs">
+          <button class="filter-btn active" id="sf-today" onclick="setStatFilter('today')">Today</button>
+          <button class="filter-btn"        id="sf-week"  onclick="setStatFilter('week')">This Week</button>
+          <button class="filter-btn"        id="sf-all"   onclick="setStatFilter('all')">All Time</button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card red">
+            <div class="stat-value" id="statPomodoros">0</div>
+            <div class="stat-label">🍅 Pomodoros</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-value" id="statFocusTime">0h 0m</div>
+            <div class="stat-label">⏱ Focus Time</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-value" id="statStreak">0</div>
+            <div class="stat-label">🔥 Day Streak</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-value" id="statTasksDone">0</div>
+            <div class="stat-label">✅ Tasks Done</div>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">Daily Pomodoros – Last 7 Days</div>
+          <div id="dailyChart"></div>
+          <div id="dailyLabels"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ HISTORY PANEL ════════ -->
+  <div id="historyWrapper" class="hidden">
+    <div class="panel-overlay" onclick="closePanel('history')"></div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="icon" style="color:#42a5f5"><svg width="22" height="22"><use href="#ic-history"/></svg></span>
+          Session History
+        </div>
+        <div class="hist-actions">
+          <button class="danger-btn" onclick="clearHistory()">
+            <span class="icon"><svg width="16" height="16"><use href="#ic-delete"/></svg></span>
+            Clear
+          </button>
+          <button class="panel-close" onclick="closePanel('history')">
+            <span class="icon"><svg width="22" height="22"><use href="#ic-close"/></svg></span>
+          </button>
+        </div>
+      </div>
+      <div class="panel-body" id="historyList">
+        <p class="empty-msg" id="emptyHistoryMsg" style="color:var(--on-surface-2)">
+          No sessions yet. Start your first Pomodoro!
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ SETTINGS MODAL ════════ -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>
+          <span class="icon"><svg width="20" height="20"><use href="#ic-settings"/></svg></span>
+          Settings
+        </h2>
+        <button class="icon-btn" onclick="closeSettings()">
+          <span class="icon"><svg width="20" height="20"><use href="#ic-close"/></svg></span>
+        </button>
+      </div>
+      <div class="modal-body">
+
+        <div class="sec-title">
+          <span class="icon"><svg width="14" height="14"><use href="#ic-timer"/></svg></span>
+          Time (minutes)
+        </div>
+        <div class="time-inputs">
+          <div class="t-group"><label>Pomodoro</label>
+            <input type="number" id="setPomodoroTime" class="num-input" min="1" max="60" value="25"/>
+          </div>
+          <div class="t-group"><label>Short Break</label>
+            <input type="number" id="setShortBreakTime" class="num-input" min="1" max="30" value="5"/>
+          </div>
+          <div class="t-group"><label>Long Break</label>
+            <input type="number" id="setLongBreakTime" class="num-input" min="1" max="60" value="15"/>
+          </div>
+        </div>
+
+        <hr class="divider"/>
+
+        <div class="sec-title">
+          <span class="icon"><svg width="14" height="14"><use href="#ic-renew"/></svg></span>
+          Auto Start
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Auto-start Breaks</span>
+          <label class="toggle-wrap"><input type="checkbox" id="setAutoBreak"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Auto-start Pomodoros</span>
+          <label class="toggle-wrap"><input type="checkbox" id="setAutoPomodoro"/><span class="toggle-track"></span></label>
+        </div>
+
+        <hr class="divider"/>
+
+        <div class="sec-title">
+          <span class="icon"><svg width="14" height="14"><use href="#ic-coffee"/></svg></span>
+          Long Break
+        </div>
+        <div class="interval-row">
+          <span class="toggle-label">Long Break Interval</span>
+          <input type="number" id="setLongBreakInterval" class="interval-input" min="2" max="10" value="4"/>
+        </div>
+        <p class="hint-text">Pomodoros before a long break</p>
+
+        <hr class="divider"/>
+
+        <div class="sec-title">
+          <span class="icon"><svg width="14" height="14"><use href="#ic-volume"/></svg></span>
+          Notifications
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Sound Alerts</span>
+          <label class="toggle-wrap"><input type="checkbox" id="setSoundEnabled" checked/><span class="toggle-track"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Browser Notifications</span>
+          <label class="toggle-wrap"><input type="checkbox" id="setNotifEnabled"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="volume-row">
+          <label>Volume</label>
+          <input type="range" id="setVolume" min="0" max="100" value="80"/>
+        </div>
+
+        <hr class="divider"/>
+
+        <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ COMPLETION MODAL ════════ -->
+  <div id="completionModal" class="modal-backdrop hidden">
+    <div class="modal completion-inner" style="max-width:300px">
+      <div class="completion-emoji" id="completionEmoji">🍅</div>
+      <div class="completion-title" id="completionTitle">Pomodoro Complete!</div>
+      <div class="completion-msg"   id="completionMsg">Great work! Time for a break.</div>
+      <div class="completion-btns">
+        <button class="btn-stay" onclick="dismissCompletion(false)">Stay</button>
+        <button class="btn-next" onclick="dismissCompletion(true)"  id="completionNextBtn">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ TOAST ════════ -->
+  <div id="toast" class="hidden">
+    <span class="icon" id="toastIcon"><svg width="16" height="16"><use href="#ic-ok"/></svg></span>
+    <span id="toastMsg">Saved!</span>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════
+       JAVASCRIPT
+  ════════════════════════════════════════════════ -->
+  <script>
+  /* ══ CONSTANTS ══════════════════════════════════ */
+  const M = { P:'pomodoro', S:'shortbreak', L:'longbreak' };
+  const LABELS = { pomodoro:'FOCUS TIME', shortbreak:'SHORT BREAK', longbreak:'LONG BREAK' };
+  const CIRC = 2 * Math.PI * 130; // ≈ 816.81
+
+  /* ══ STATE ══════════════════════════════════════ */
+  let cfg = {
+    pomodoroTime:25, shortBreakTime:5, longBreakTime:15,
+    longBreakInterval:4,
+    autoBreak:false, autoPomodoro:false,
+    soundEnabled:true, notifEnabled:false, volume:80,
+  };
+  let ts = {
+    mode: M.P, running:false,
+    timeLeft:0, totalTime:0,
+    sessionCount:0, totalPomodoros:0,
+    tid:null,
+  };
+  let tasks=[], history=[], statFilter='today';
+
+  /* ══ INIT ═══════════════════════════════════════ */
+  function init() {
+    loadLS();
+    applyDark(false);
+    applyMode(ts.mode, false);
+    renderDots();
+    renderTasks();
+    renderHistory();
+    renderStats();
+    if (!localStorage.getItem('pomo_hint')) {
+      setTimeout(() => {
+        showToast('Tip: Space = start/pause  ·  R = reset  ·  S = skip', 'ic-keyboard', 5000);
+        localStorage.setItem('pomo_hint','1');
+      }, 1800);
+    }
+  }
+
+  /* ══ STORAGE ════════════════════════════════════ */
+  function save() {
+    localStorage.setItem('pomo_cfg', JSON.stringify(cfg));
+    localStorage.setItem('pomo_history', JSON.stringify(history));
+    localStorage.setItem('pomo_tasks', JSON.stringify(tasks));
+    localStorage.setItem('pomo_ts', JSON.stringify({
+      mode:ts.mode, sessionCount:ts.sessionCount, totalPomodoros:ts.totalPomodoros
+    }));
+  }
+
+  function loadLS() {
+    try {
+      const c = localStorage.getItem('pomo_cfg');
+      if (c) Object.assign(cfg, JSON.parse(c));
+      const h = localStorage.getItem('pomo_history');
+      if (h) history = JSON.parse(h);
+      const t = localStorage.getItem('pomo_tasks');
+      if (t) tasks = JSON.parse(t);
+      const s = localStorage.getItem('pomo_ts');
+      if (s) { const v=JSON.parse(s); ts.mode=v.mode||M.P; ts.sessionCount=v.sessionCount||0; ts.totalPomodoros=v.totalPomodoros||0; }
+    } catch(_) {}
+  }
+
+  /* ══ MODE ═══════════════════════════════════════ */
+  const MODE_MINS = { [M.P]: () => cfg.pomodoroTime, [M.S]: () => cfg.shortBreakTime, [M.L]: () => cfg.longBreakTime };
+  function modeSecs(m) { return MODE_MINS[m]() * 60; }
+
+  function applyMode(mode, doReset=true) {
+    ts.mode = mode;
+    ts.totalTime = modeSecs(mode);
+    if (doReset) { stop(); ts.timeLeft=ts.totalTime; setIcon('play'); hidePulse(); }
+
+    // Background gradient
+    document.getElementById('appBody').style.background =
+      mode===M.P ? 'linear-gradient(135deg,#b71c1c 0%,#ef5350 55%,#ff8a65 100%)' :
+      mode===M.S ? 'linear-gradient(135deg,#0d47a1 0%,#42a5f5 55%,#80d8ff 100%)' :
+                   'linear-gradient(135deg,#1b5e20 0%,#66bb6a 55%,#b9f6ca 100%)';
+
+    // Tab highlight
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('btn-'+mode).classList.add('active');
+
+    document.getElementById('sessionLabel').textContent = LABELS[mode];
+    if (doReset) updateDisplay();
+    save();
+  }
+
+  function switchMode(m) {
+    if (ts.running && !confirm('Timer is running. Switch mode?')) return;
+    applyMode(m, true);
+  }
+
+  /* ══ TIMER ══════════════════════════════════════ */
+  function toggleTimer() { ts.running ? pause() : start(); }
+
+  function start() {
+    if (ts.timeLeft <= 0) ts.timeLeft = ts.totalTime;
+    ts.running = true; setIcon('pause'); showPulse();
+    ts.tid = setInterval(tick, 1000); save();
+  }
+
+  function pause() { ts.running=false; clearInterval(ts.tid); setIcon('play'); hidePulse(); save(); }
+  function stop()  { clearInterval(ts.tid); ts.running=false; }
+
+  function resetTimer() {
+    stop(); ts.timeLeft=ts.totalTime;
+    setIcon('play'); hidePulse(); updateDisplay(); save();
+  }
+
+  function skipSession() { if(ts.running) pause(); onEnd(true); }
+
+  function tick() {
+    ts.timeLeft = Math.max(0, ts.timeLeft-1);
+    updateDisplay();
+    if (ts.timeLeft===0) onEnd(false);
+  }
+
+  function onEnd(skipped) {
+    stop(); setIcon('play'); hidePulse();
+    if (ts.mode===M.P && !skipped) {
+      ts.sessionCount++; ts.totalPomodoros++;
+      history.unshift({ id:Date.now(), date:new Date().toISOString(),
+                        duration:cfg.pomodoroTime, mode:M.P, label:'Pomodoro' });
+      chime('complete');
+      notif('🍅 Pomodoro Complete!', 'Time for a break.');
+      showCompletion(true);
+    } else if ((ts.mode===M.S || ts.mode===M.L) && !skipped) {
+      chime('break');
+      notif('☕ Break Over!', "Ready to focus again?");
+      showCompletion(false);
+    } else { advance(); }
+    renderDots(); renderHistory(); renderStats(); save();
+  }
+
+  function advance() {
+    if (ts.mode===M.P) {
+      const nxt = (ts.sessionCount%cfg.longBreakInterval===0 && ts.sessionCount>0) ? M.L : M.S;
+      applyMode(nxt, true);
+      if (cfg.autoBreak) start();
+    } else {
+      applyMode(M.P, true);
+      if (cfg.autoPomodoro) start();
+    }
+  }
+
+  /* ══ DISPLAY ════════════════════════════════════ */
+  function fmt(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+
+  function updateDisplay() {
+    const t = fmt(ts.timeLeft);
+    document.getElementById('timerDisplay').textContent = t;
+    document.getElementById('timerSubtitle').textContent = `Session ${ts.totalPomodoros+1}`;
+    document.title = `${t} – ${LABELS[ts.mode]} | Pomodoro`;
+    const pct = ts.totalTime>0 ? ts.timeLeft/ts.totalTime : 1;
+    const ring = document.getElementById('progressRing');
+    ring.style.strokeDasharray  = CIRC;
+    ring.style.strokeDashoffset = CIRC*(1-pct);
+  }
+
+  function setIcon(name) {
+    document.getElementById('startIconWrap').innerHTML =
+      `<svg width="42" height="42"><use href="#ic-${name}"/></svg>`;
+  }
+  function showPulse() { document.getElementById('pulseRing').classList.remove('hidden'); }
+  function hidePulse() { document.getElementById('pulseRing').classList.add('hidden'); }
+
+  /* ══ DOTS ═══════════════════════════════════════ */
+  function renderDots() {
+    const c = document.getElementById('pomodoroCounter');
+    c.innerHTML = '';
+    const n = cfg.longBreakInterval;
+    const f = ts.sessionCount % n;
+    for (let i=0;i<n;i++) {
+      const d = document.createElement('div');
+      d.className = 'pom-dot'+(i<f?' filled':'');
+      c.appendChild(d);
+    }
+    document.getElementById('timerSubtitle').textContent = `Session ${ts.totalPomodoros+1}`;
+  }
+
+  /* ══ TASKS ══════════════════════════════════════ */
+  function addTask() {
+    const inp=document.getElementById('taskInput'), txt=inp.value.trim();
+    if (!txt) return;
+    tasks.unshift({id:Date.now(),text:txt,done:false});
+    inp.value=''; renderTasks(); save();
+  }
+
+  function toggleTask(id) {
+    const t=tasks.find(x=>x.id===id); if(!t) return;
+    t.done=!t.done;
+    if (t.done) {
+      history.unshift({id:Date.now(),date:new Date().toISOString(),mode:'task',label:t.text,duration:0});
+      renderHistory(); renderStats();
+    }
+    renderTasks(); save();
+  }
+
+  function deleteTask(id) { tasks=tasks.filter(x=>x.id!==id); renderTasks(); save(); }
+
+  function clearCompletedTasks() {
+    tasks=tasks.filter(x=>!x.done); renderTasks(); save();
+    showToast('Completed tasks cleared','ic-clear');
+  }
+
+  function renderTasks() {
+    const list=document.getElementById('taskList');
+    const empty=document.getElementById('emptyTaskMsg');
+    document.getElementById('taskCount').textContent = tasks.filter(x=>!x.done).length;
+    list.innerHTML='';
+    if (!tasks.length) { list.appendChild(empty); return; }
+    tasks.forEach(t => {
+      const li=document.createElement('li');
+      li.className='task-item';
+      li.innerHTML=`
+        <button class="task-check-btn${t.done?' done':''}" onclick="toggleTask(${t.id})">
+          <span class="icon"><svg width="14" height="14"><use href="#ic-check"/></svg></span>
+        </button>
+        <span class="task-text${t.done?' done':''}">${esc(t.text)}</span>
+        <button class="task-del-btn" onclick="deleteTask(${t.id})">
+          <span class="icon"><svg width="16" height="16"><use href="#ic-close"/></svg></span>
+        </button>`;
+      list.appendChild(li);
+    });
+  }
+
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  /* ══ HISTORY ════════════════════════════════════ */
+  function renderHistory() {
+    const container=document.getElementById('historyList');
+    const empty=document.getElementById('emptyHistoryMsg');
+    if (!history.length) { container.innerHTML=''; container.appendChild(empty); return; }
+    if (empty.parentNode) empty.remove();
+    container.innerHTML='';
+    const groups={};
+    history.forEach(item => {
+      const k=new Date(item.date).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+      if(!groups[k]) groups[k]=[];
+      groups[k].push(item);
+    });
+    for (const [day,items] of Object.entries(groups)) {
+      const wrap=document.createElement('div');
+      wrap.innerHTML=`<div class="hist-day">${day}</div>`;
+      items.forEach(item => {
+        const div=document.createElement('div'); div.className='hist-item';
+        const time=new Date(item.date).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+        const emoji=item.mode===M.P?'🍅':item.mode==='task'?'✅':'☕';
+        const cls=item.mode===M.P?'pom':item.mode==='task'?'task':'break';
+        const lbl=item.mode===M.P?`${item.duration}m`:item.mode==='task'?'done':'break';
+        div.innerHTML=`
+          <span class="hist-emoji">${emoji}</span>
+          <div class="hist-info">
+            <div class="hist-title">${esc(item.label||'Pomodoro')}</div>
+            <div class="hist-meta">${time}${item.duration?` · ${item.duration} min`:''}</div>
+          </div>
+          <span class="hist-badge ${cls}">${lbl}</span>`;
+        wrap.appendChild(div);
+      });
+      container.appendChild(wrap);
+    }
+  }
+
+  function clearHistory() {
+    if (!confirm('Clear all session history?')) return;
+    history=[]; ts.totalPomodoros=0; ts.sessionCount=0;
+    renderHistory(); renderDots(); renderStats(); save();
+    showToast('History cleared','ic-delete');
+  }
+
+  /* ══ STATS ══════════════════════════════════════ */
+  function setStatFilter(f) {
+    statFilter=f;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('sf-'+f).classList.add('active');
+    renderStats();
+  }
+
+  function filteredPoms() {
+    const now=new Date();
+    return history.filter(h=>{
+      if (h.mode!==M.P) return false;
+      const d=new Date(h.date);
+      if (statFilter==='today') return d.toDateString()===now.toDateString();
+      if (statFilter==='week')  { const w=new Date(now); w.setDate(now.getDate()-7); return d>=w; }
+      return true;
+    });
+  }
+
+  function renderStats() {
+    const poms=filteredPoms(), mins=poms.reduce((a,p)=>a+(p.duration||0),0);
+    document.getElementById('statPomodoros').textContent = poms.length;
+    document.getElementById('statFocusTime').textContent = `${Math.floor(mins/60)}h ${mins%60}m`;
+    document.getElementById('statStreak').textContent    = calcStreak();
+    document.getElementById('statTasksDone').textContent = history.filter(h=>h.mode==='task').length;
+    drawChart();
+  }
+
+  function calcStreak() {
+    const dates=new Set(history.filter(h=>h.mode===M.P).map(h=>new Date(h.date).toDateString()));
+    if (!dates.size) return 0;
+    let n=0, d=new Date();
+    while (dates.has(d.toDateString())) { n++; d.setDate(d.getDate()-1); }
+    return n;
+  }
+
+  function drawChart() {
+    const ch=document.getElementById('dailyChart'), lb=document.getElementById('dailyLabels');
+    ch.innerHTML=''; lb.innerHTML='';
+    const days=Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(6-i)); return d; });
+    const counts=days.map(d=>history.filter(h=>h.mode===M.P&&new Date(h.date).toDateString()===d.toDateString()).length);
+    const mx=Math.max(...counts,1);
+    days.forEach((d,i)=>{
+      const bar=document.createElement('div'); bar.className='bar';
+      bar.style.height=`${Math.max((counts[i]/mx)*CHART_MAX_H, counts[i]>0 ? CHART_MIN_H : CHART_EMPTY_H)}px`;
+      bar.style.background=counts[i]>0?'#ef5350':'#e0e0e0';
+      bar.title=plural(counts[i], 'pomodoro');
+      ch.appendChild(bar);
+      const sp=document.createElement('span');
+      sp.textContent=d.toLocaleDateString('en',{weekday:'narrow'});
+      lb.appendChild(sp);
+    });
+  }
+
+  /* ══ SOUND ══════════════════════════════════════ */
+  const CHART_MAX_H = 72;    // px height for a full bar
+  const CHART_MIN_H = 10;    // px minimum height for a non-zero bar
+  const CHART_EMPTY_H = 4;   // px height for an empty bar
+  function plural(n, word) { return `${n} ${word}${n !== 1 ? 's' : ''}`; }
+  let _ac=null;
+  function getAC() { return _ac||(_ac=new(window.AudioContext||window.webkitAudioContext)()); }
+
+  function chime(type) {
+    if (!cfg.soundEnabled) return;
+    try {
+      const ctx=getAC(), v=cfg.volume/100;
+      if (type==='complete') {
+        [[523.25,0],[659.25,.22],[783.99,.44]].forEach(([f,t])=>{
+          const o=ctx.createOscillator(),g=ctx.createGain();
+          o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=f;
+          g.gain.setValueAtTime(0,ctx.currentTime+t);
+          g.gain.linearRampToValueAtTime(v*.38,ctx.currentTime+t+.06);
+          g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.65);
+          o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+.7);
+        });
+      } else {
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=440;
+        g.gain.setValueAtTime(v*.28,ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.9);
+        o.start();o.stop(ctx.currentTime+1);
+      }
+    } catch(_) {}
+  }
+
+  /* ══ NOTIFICATIONS ══════════════════════════════ */
+  function notif(title,body) {
+    if (cfg.notifEnabled && window.Notification && Notification.permission==='granted')
+      new Notification(title,{body});
+  }
+
+  /* ══ SETTINGS ═══════════════════════════════════ */
+  function openSettings() {
+    document.getElementById('setPomodoroTime').value    = cfg.pomodoroTime;
+    document.getElementById('setShortBreakTime').value  = cfg.shortBreakTime;
+    document.getElementById('setLongBreakTime').value   = cfg.longBreakTime;
+    document.getElementById('setLongBreakInterval').value = cfg.longBreakInterval;
+    document.getElementById('setAutoBreak').checked     = cfg.autoBreak;
+    document.getElementById('setAutoPomodoro').checked  = cfg.autoPomodoro;
+    document.getElementById('setSoundEnabled').checked  = cfg.soundEnabled;
+    document.getElementById('setNotifEnabled').checked  = cfg.notifEnabled;
+    document.getElementById('setVolume').value          = cfg.volume;
+    document.getElementById('settingsModal').classList.remove('hidden');
+  }
+
+  function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+
+  function clamp(v,lo,hi) { return Math.max(lo,Math.min(hi,parseInt(v)||lo)); }
+
+  function saveSettings() {
+    cfg.pomodoroTime      = clamp(document.getElementById('setPomodoroTime').value,   1,60);
+    cfg.shortBreakTime    = clamp(document.getElementById('setShortBreakTime').value, 1,30);
+    cfg.longBreakTime     = clamp(document.getElementById('setLongBreakTime').value,  1,60);
+    cfg.longBreakInterval = clamp(document.getElementById('setLongBreakInterval').value,2,10);
+    cfg.autoBreak         = document.getElementById('setAutoBreak').checked;
+    cfg.autoPomodoro      = document.getElementById('setAutoPomodoro').checked;
+    cfg.soundEnabled      = document.getElementById('setSoundEnabled').checked;
+    cfg.notifEnabled      = document.getElementById('setNotifEnabled').checked;
+    cfg.volume            = parseInt(document.getElementById('setVolume').value)||80;
+    if (cfg.notifEnabled && window.Notification && Notification.permission==='default')
+      Notification.requestPermission();
+    applyMode(ts.mode,true); renderDots(); save(); closeSettings();
+    showToast('Settings saved!','ic-ok');
+  }
+
+  /* ══ PANELS ═════════════════════════════════════ */
+  function showPanel(n) {
+    document.getElementById(n+'Wrapper').classList.remove('hidden');
+    if(n==='stats') { setStatFilter(statFilter); renderStats(); }
+    if(n==='history') renderHistory();
+  }
+  function closePanel(n) { document.getElementById(n+'Wrapper').classList.add('hidden'); }
+
+  /* ══ COMPLETION MODAL ═══════════════════════════ */
+  function showCompletion(isP) {
+    const isL = isP && ts.sessionCount%cfg.longBreakInterval===0;
+    document.getElementById('completionEmoji').textContent = isP?'🍅':'⚡';
+    document.getElementById('completionTitle').textContent = isP?'Pomodoro Complete!':'Break Complete!';
+    document.getElementById('completionMsg').textContent   = isP
+      ? (isL?`Time for a ${cfg.longBreakTime}-min long break!`:`Time for a ${cfg.shortBreakTime}-min short break!`)
+      : "Ready to focus again? Let's go!";
+    document.getElementById('completionNextBtn').textContent = isP
+      ? (isL?'☕ Long Break →':'☕ Short Break →')
+      : '🍅 Start Pomodoro →';
+    document.getElementById('completionModal').classList.remove('hidden');
+  }
+
+  function dismissCompletion(adv) {
+    document.getElementById('completionModal').classList.add('hidden');
+    if (adv) advance();
+  }
+
+  /* ══ DARK MODE ══════════════════════════════════ */
+  function applyDark(persist) {
+    const on = localStorage.getItem('pomo_dark')==='1';
+    document.body.classList.toggle('dark', on);
+    document.getElementById('darkIcon').innerHTML =
+      `<svg width="22" height="22"><use href="${on?'#ic-light':'#ic-dark'}"/></svg>`;
+    if (persist) save();
+  }
+
+  function toggleDark() {
+    const on = !document.body.classList.contains('dark');
+    localStorage.setItem('pomo_dark', on?'1':'0');
+    document.body.classList.toggle('dark', on);
+    document.getElementById('darkIcon').innerHTML =
+      `<svg width="22" height="22"><use href="${on?'#ic-light':'#ic-dark'}"/></svg>`;
+  }
+
+  /* ══ TOAST ══════════════════════════════════════ */
+  let _tt=null;
+  function showToast(msg, iconId='ic-ok', ms=3000) {
+    clearTimeout(_tt);
+    document.getElementById('toastMsg').textContent = msg;
+    document.getElementById('toastIcon').innerHTML = `<svg width="16" height="16"><use href="#${iconId}"/></svg>`;
+    const el=document.getElementById('toast');
+    el.classList.remove('hidden');
+    _tt=setTimeout(()=>el.classList.add('hidden'), ms);
+  }
+
+  /* ══ KEYBOARD ═══════════════════════════════════ */
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName==='INPUT') return;
+    if (e.code==='Space')  { e.preventDefault(); toggleTimer(); }
+    if (e.code==='KeyR')   resetTimer();
+    if (e.code==='KeyS')   skipSession();
+    if (e.code==='Digit1') switchMode(M.P);
+    if (e.code==='Digit2') switchMode(M.S);
+    if (e.code==='Digit3') switchMode(M.L);
+  });
+
+  /* ══ START ══════════════════════════════════════ */
+  init();
+  </script>
+</body>
+</html>
